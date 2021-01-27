@@ -107,6 +107,8 @@ class TrainManager:
                                      "'token_accuracy', 'sequence_accuracy'.")
         self.early_stopping_metric = train_config.get("early_stopping_metric",
                                                       "eval_metric")
+        self.early_stopping_patience = train_config.get("early_stopping_patience",
+                                                      None)
 
         # early_stopping_metric decides on how to find the early stopping point:
         # ckpts are written when there's a new high/low score for this metric.
@@ -191,7 +193,8 @@ class TrainManager:
             total_tokens=0,
             best_ckpt_iter=0,
             best_ckpt_score=np.inf if self.minimize_metric else -np.inf,
-            minimize_metric=self.minimize_metric
+            minimize_metric=self.minimize_metric,
+            num_not_improved=0
         )
 
         # model parameters
@@ -225,6 +228,7 @@ class TrainManager:
             "total_tokens": self.stats.total_tokens,
             "best_ckpt_score": self.stats.best_ckpt_score,
             "best_ckpt_iteration": self.stats.best_ckpt_iter,
+            "num_not_improved": self.stats.num_not_improved,
             "model_state": model_state_dict,
             "optimizer_state": self.optimizer.state_dict(),
             "scheduler_state": self.scheduler.state_dict() if
@@ -295,6 +299,7 @@ class TrainManager:
         if not reset_best_ckpt:
             self.stats.best_ckpt_score = model_checkpoint["best_ckpt_score"]
             self.stats.best_ckpt_iter = model_checkpoint["best_ckpt_iteration"]
+            self.stats.num_not_improved = model_checkpoint["num_not_improved"]
         else:
             logger.info("Reset tracking of the best checkpoint.")
 
@@ -435,8 +440,8 @@ class TrainManager:
                     break
             if self.stats.stop:
                 logger.info(
-                    'Training ended since minimum lr %f was reached.',
-                    self.learning_rate_min)
+                    'Training ended since either minimum lr %f or early stopping patience of %i number of checkpoints without improvment was reached.',
+                    self.learning_rate_min, self.early_stopping_patience)
                 break
 
             logger.info('Epoch %3d: total training loss %.2f',
@@ -536,15 +541,20 @@ class TrainManager:
             ckpt_score = valid_score
 
         new_best = False
+        log_metric = self.eval_metric if self.early_stopping_metric == "eval_metric" else self.early_stopping_metric
         if self.stats.is_best(ckpt_score):
             self.stats.best_ckpt_score = ckpt_score
             self.stats.best_ckpt_iter = self.stats.steps
             logger.info('Hooray! New best validation result [%s]!',
-                        self.early_stopping_metric)
+                        log_metric)
             if self.ckpt_queue.maxsize > 0:
                 logger.info("Saving new checkpoint.")
                 new_best = True
                 self._save_checkpoint()
+        else:
+            self.stats.num_not_improved +=1
+            logger.info('Validation in [%s] not improved for %i checkpoints (%f vs. best %f %s)!',
+                        log_metric, self.stats.num_not_improved, ckpt_score , self.stats.best_ckpt_score, log_metric)
 
         if self.scheduler is not None \
                 and self.scheduler_step_at == "validation":
@@ -605,14 +615,17 @@ class TrainManager:
         for param_group in self.optimizer.param_groups:
             current_lr = param_group['lr']
 
-        if current_lr < self.learning_rate_min:
+        if self.early_stopping_patience is not None and self.stats.num_not_improved == self.early_stopping_patience: 
+            self.stats.stop = True
+
+        elif current_lr < self.learning_rate_min:
             self.stats.stop = True
 
         with open(self.valid_report_file, 'a') as opened_file:
             opened_file.write(
-                "Steps: {}\tLoss: {:.5f}\tPPL: {:.5f}\t{}: {:.5f}\t"
+                "Steps: {}\tLoss: {:.5f}\tPPL: {:.5f}\t{}: {:.5f} (not improved for {} checkpoints)\t"
                 "LR: {:.8f}\t{}\n".format(
-                    self.stats.steps, valid_loss, valid_ppl, eval_metric,
+                    self.stats.steps, valid_loss, valid_ppl, eval_metric, self.stats.num_not_improved,
                     valid_score, current_lr, "*" if new_best else ""))
 
     def _log_parameters_list(self) -> None:
@@ -677,7 +690,8 @@ class TrainManager:
         def __init__(self, steps: int = 0, stop: bool = False,
                      total_tokens: int = 0, best_ckpt_iter: int = 0,
                      best_ckpt_score: float = np.inf,
-                     minimize_metric: bool = True) -> None:
+                     minimize_metric: bool = True,
+                     num_not_improved: int = 0) -> None:
             # global update step counter
             self.steps = steps
             # stop training if this flag is True
@@ -691,6 +705,8 @@ class TrainManager:
             self.best_ckpt_score = best_ckpt_score
             # minimize or maximize score
             self.minimize_metric = minimize_metric
+            # number of steps for which validation metric has not improved
+            self.num_not_improved = num_not_improved
 
         def is_best(self, score):
             if self.minimize_metric:
