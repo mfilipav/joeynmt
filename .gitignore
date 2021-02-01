@@ -4,3 +4,8 @@ dist/*
 *.egg-info/*
 docs/build/*
 *__pycache__*
+
+# new updates, delete before merging to master!!!
+models/*
+.vscode/*
+*.pyc
