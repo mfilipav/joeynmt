@@ -2,6 +2,9 @@
 [![Build Status](https://travis-ci.com/joeynmt/joeynmt.svg?branch=master)](https://travis-ci.org/joeynmt/joeynmt)
 [![Gitter](https://badges.gitter.im/joeynmt/community.svg)](https://gitter.im/joeynmt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
+## WIP: Accept continuous 2D pose features as inputs
+`pose-input` branch will deal with adapting JoeyNMT to accept continuous pose feature vectors. In terms of Transformer model inputs, we’re not using discrete tokens that correspond to words or sub-words, and their embeddings, but rather continuous pose feature vectors. As such, I tried to modify the architecture to forego the embedding step and start by inputting the pose features directly into the first linear Transformer layer (the pose features are our “embedding”). 
+
 ## Goal and Purpose
 :koala: Joey NMT framework is developed for educational purposes.
 It aims to be a **clean** and **minimalistic** code base to help novices 
