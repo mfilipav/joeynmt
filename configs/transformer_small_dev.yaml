@@ -1,11 +1,11 @@
-name: "my_experiment"
+name: "transformer_dev"
 
 data: # specify your data here
     src: "de"                       # src language: expected suffix of train files, e.g. "train.de"
     trg: "en"                       # trg language
-    train: "test/data/toy/train"    # training data
-    dev: "test/data/toy/dev"        # development data for validation
-    test: "test/data/toy/test"      # test data for testing final model; optional
+    train: "test/data/toy_dev/train"    # training data
+    dev: "test/data/toy_dev/dev"        # development data for validation
+    test: "test/data/toy_dev/test"      # test data for testing final model; optional
     level: "word"                   # segmentation level: either "word", "bpe" or "char"
     lowercase: True                 # lowercase the data, also for validation
     max_sent_length: 30             # filter out longer sentences from training (src+trg)
@@ -15,6 +15,7 @@ data: # specify your data here
     trg_voc_limit: 102              # trg vocabulary only includes this many most frequent tokens, default: unlimited
     #src_vocab: "my_model/src_vocab.txt"  # if specified, load a vocabulary from this file
     #trg_vocab: "my_model/trg_vocab.txt"  # one token per line, line number is index
+    continuous_src: False
 
 testing:                            # specify which inference algorithm to use for testing (for validation it's always greedy decoding)
     beam_size: 5                    # size of the beam for beam search
@@ -35,17 +36,17 @@ training:                           # specify training details here
     #clip_grad_val: 1.0             # for Transformer do not clip (so leave commented out)
     #clip_grad_norm: 1.0            # for Transformer do not clip (so leave commented out)
     weight_decay: 0.                # l2 regularization, default: 0
-    batch_size: 250                 # mini-batch size as number of sentences (when batch_type is "sentence"; default) or total number of tokens (when batch_type is "token")
-    batch_type: "token"             # create batches with sentences ("sentence", default) or tokens ("token")
+    batch_size: 8                 # default: 250, mini-batch size as number of sentences (when batch_type is "sentence"; default) or total number of tokens (when batch_type is "token")
+    batch_type: "sentence"          # create batches with sentences ("sentence", default) or tokens ("token")
     batch_multiplier: 1             # increase the effective batch size with values >1 to batch_multiplier*batch_size without increasing memory consumption by making updates only every batch_multiplier batches
     normalization: "batch"          # loss normalization of a mini-batch, default: "batch" (by number of sequences in batch), other options: "tokens" (by number of tokens in batch), "none" (don't normalize, sum up loss)
     scheduling: "noam"              # learning rate scheduling, optional, if not specified stays constant, options: "plateau", "exponential", "decaying", "noam" (for Transformer), "warmupexponentialdecay"
-    epochs: 10                      # train for this many epochs
-    validation_freq: 100            # validate after this many updates (number of mini-batches), default: 1000
-    logging_freq: 10                # log the training progress after this many updates, default: 100
+    epochs: 4                       # train for this many epochs
+    validation_freq: 2              # validate after this many updates (number of mini-batches), default: 1000
+    logging_freq: 100               # log the training progress after this many updates, default: 100
     eval_metric: "bleu"             # validation metric, default: "bleu", other options: "chrf", "token_accuracy", "sequence_accuracy"
     early_stopping_metric: "loss"   # when a new high score on this metric is achieved, a checkpoint is written, when "eval_metric" (default) is maximized, when "loss" or "ppl" is minimized
-    model_dir: "models/transformer" # directory where models and validation results are stored, required
+    model_dir: "models/transformer_small"  # directory where models and validation results are stored, required
     overwrite: True                 # overwrite existing model directory, default: False. Do not set to True unless for debugging!
     shuffle: True                   # shuffle the training data, default: True
     use_cuda: False                 # use CUDA for acceleration on GPU, required. Set to False when working on CPU.
@@ -53,7 +54,7 @@ training:                           # specify training details here
     print_valid_sents: [0, 1, 2]    # print this many validation sentences during each validation run, default: [0, 1, 2]
     keep_last_ckpts: 3              # keep this many of the latest checkpoints, if -1: all of them, default: 5
     label_smoothing: 0.0            # label smoothing: reference tokens will have 1-label_smoothing probability instead of 1, rest of probability mass is uniformly distributed over the rest of the vocabulary, default: 0.0 (off)
-
+    
 model:                              # specify your model architecture here
     initializer: "xavier"           # initializer for all trainable weights (xavier, zeros, normal, uniform)
     init_gain: 1.0                  # gain for Xavier initializer (default: 1.0)
@@ -86,3 +87,4 @@ model:                              # specify your model architecture here
         ff_size: 128                # size of position-wise feed-forward layer
         dropout: 0.1
         freeze: False               # if True, decoder parameters are not updated during training (does not include embedding parameters, but attention)
+    continuous_src: False           # if True, source consists of continuous numerical values

@@ -7,5 +7,5 @@ docs/build/*
 
 # new updates, delete before merging to master!!!
 models/*
-.vscode/*
+# .vscode/*
 *.pyc
