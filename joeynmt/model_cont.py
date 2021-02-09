@@ -17,9 +17,9 @@ from joeynmt.vocabulary import Vocabulary
 from joeynmt.helpers import ConfigurationError
 
 
-class Model(nn.Module):
+class ContinuousModel(nn.Module):
     """
-    Base Model class
+    Continuous Model class, which supports continuous input features
     """
 
     def __init__(self,
@@ -79,7 +79,7 @@ class Model(nn.Module):
         if return_type == "loss":
             assert self.loss_function is not None
 
-            out, _, _, _ = self._encode_decode(**kwargs)
+            out, _, _, _ = self._encode_decode(**kwargs)  # added by Amit, used to have src, trg_input, src_mask, src_length, Trg_mask, 12/16/2020, 2:59:57 
 
             # compute log probs
             log_probs = F.log_softmax(out, dim=-1)
@@ -92,13 +92,13 @@ class Model(nn.Module):
             return_tuple = (batch_loss, None, None, None)
 
         elif return_type == "encode":
-            encoder_output, encoder_hidden = self._encode(**kwargs)
+            encoder_output, encoder_hidden = self._encode(**kwargs)  # added by Amit, src, src_length, src_mask
 
             # return encoder outputs
             return_tuple = (encoder_output, encoder_hidden, None, None)
 
         elif return_type == "decode":
-            outputs, hidden, att_probs, att_vectors = self._decode(**kwargs)
+            outputs, hidden, att_probs, att_vectors = self._decode(**kwargs)  #  added by Amit, trg_input, encoder_output, encoder_hidden, src_mask, unroll steps, decoder_hidden, att_vector, trg_mask
 
             # return decoder outputs
             return_tuple = (outputs, hidden, att_probs, att_vectors)
@@ -198,9 +198,10 @@ class _DataParallel(nn.DataParallel):
             return getattr(self.module, name)
 
 
-def build_model(cfg: dict = None,
+def build_model(input_size: int,
+                cfg: dict = None,
                 src_vocab: Vocabulary = None,
-                trg_vocab: Vocabulary = None) -> Model:
+                trg_vocab: Vocabulary = None) -> ContinuousModel:
     """
     Build and initialize the model according to the configuration.
 
@@ -209,12 +210,12 @@ def build_model(cfg: dict = None,
     :param trg_vocab: target vocabulary
     :return: built and initialized model
     """
-    src_padding_idx = src_vocab.stoi[PAD_TOKEN]
+    # src_padding_idx = src_vocab.stoi[PAD_TOKEN]
     trg_padding_idx = trg_vocab.stoi[PAD_TOKEN]
 
-    src_embed = Embeddings(
+    src_embed = ContinuousEmbeddings(
         **cfg["encoder"]["embeddings"], vocab_size=len(src_vocab),
-        padding_idx=src_padding_idx)
+        input_size=input_size)
 
     # this ties source and target embeddings
     # for softmax layer tying, see further below
@@ -258,9 +259,9 @@ def build_model(cfg: dict = None,
             **cfg["decoder"], encoder=encoder, vocab_size=len(trg_vocab),
             emb_size=trg_embed.embedding_dim, emb_dropout=dec_emb_dropout)
 
-    model = Model(encoder=encoder, decoder=decoder,
+    model = ContinuousModel(encoder=encoder, decoder=decoder,
                   src_embed=src_embed, trg_embed=trg_embed,
-                  src_vocab=src_vocab, trg_vocab=trg_vocab)
+                  trg_vocab=trg_vocab)
 
     # tie softmax layer with trg embeddings
     if cfg.get("tied_softmax", False):
@@ -275,6 +276,6 @@ def build_model(cfg: dict = None,
                 "The decoder must be a Transformer.")
 
     # custom initialization of model parameters
-    initialize_model(model, cfg, src_padding_idx, trg_padding_idx)
+    initialize_model(model, cfg, trg_padding_idx)
 
     return model
