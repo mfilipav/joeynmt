@@ -17,7 +17,7 @@ from joeynmt.vocabulary import Vocabulary
 from joeynmt.helpers import ConfigurationError
 
 
-class ContinuousModel(nn.Module):
+class Model(nn.Module):
     """
     Continuous Model class, which supports continuous input features
     """
@@ -201,7 +201,7 @@ class _DataParallel(nn.DataParallel):
 def build_model(input_size: int,
                 cfg: dict = None,
                 src_vocab: Vocabulary = None,
-                trg_vocab: Vocabulary = None) -> ContinuousModel:
+                trg_vocab: Vocabulary = None) -> Model:
     """
     Build and initialize the model according to the configuration.
 
@@ -259,7 +259,7 @@ def build_model(input_size: int,
             **cfg["decoder"], encoder=encoder, vocab_size=len(trg_vocab),
             emb_size=trg_embed.embedding_dim, emb_dropout=dec_emb_dropout)
 
-    model = ContinuousModel(encoder=encoder, decoder=decoder,
+    model = Model(encoder=encoder, decoder=decoder,
                   src_embed=src_embed, trg_embed=trg_embed,
                   trg_vocab=trg_vocab)
 
