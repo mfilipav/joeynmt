@@ -21,12 +21,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 from torchtext.data import Dataset
 
-from joeynmt.model import build_model
 from joeynmt.batch import Batch
 from joeynmt.helpers import log_data_info, load_config, log_cfg, \
     store_attention_plots, load_checkpoint, make_model_dir, \
     make_logger, set_seed, symlink_update, ConfigurationError
-from joeynmt.model import Model, _DataParallel
+# from joeynmt.model import Model, _DataParallel, build_model
+from joeynmt.model_cont import Model, _DataParallel, build_model
 from joeynmt.prediction import validate_on_data
 from joeynmt.loss import XentLoss
 from joeynmt.data import load_data, make_data_iter
@@ -718,11 +718,24 @@ def train(cfg_file: str) -> None:
     set_seed(seed=cfg["training"].get("random_seed", 42))
 
     # load the data
-    train_data, dev_data, test_data, src_vocab, trg_vocab = load_data(
-        data_cfg=cfg["data"])
+    if cfg["data"]["continuous_src_features"]:
+        train_data, dev_data, test_data, src_vocab, trg_vocab = load_data(data_cfg=cfg["data"])
+        logger.info("   loaded data with continuous src_features...")
+    else:
+        train_data, dev_data, test_data, trg_vocab, src_vocab = load_data(data_cfg=cfg["data"])
+        logger.info("   loaded data with discrete src features...")
 
-    # build an encoder-decoder model
-    model = build_model(cfg["model"], src_vocab=src_vocab, trg_vocab=trg_vocab)
+    # build an encoder-decoder model  
+    if cfg["data"]["continuous_src_features"]:
+        model = build_model(input_size=cfg["data"]["input_size"],
+                            cfg=cfg,
+                            src_vocab=None,
+                            trg_vocab=trg_vocab)
+    else:
+        model = build_model(input_size=None,
+                            cfg=cfg,
+                            src_vocab=src_vocab,
+                            trg_vocab=trg_vocab)
 
     # for training management, e.g. early stopping and model selection
     trainer = TrainManager(model=model, config=cfg)

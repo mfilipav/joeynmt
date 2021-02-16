@@ -66,7 +66,7 @@ class ContinuousEmbeddings(nn.Module):
                  input_size: int,  # new, dim of cont feature vector
                  embedding_dim: int = 64,
                  scale: bool = False,
-                 vocab_size: int = 0,
+                #  vocab_size: int = 0,
                 #  padding_idx: int = 1,
                  freeze: bool = False,
                  **kwargs):
@@ -74,7 +74,7 @@ class ContinuousEmbeddings(nn.Module):
         Create new embeddings for the vocabulary.
         Use scaling for the Transformer.
 
-        :param input_size: dim of cont feature vector
+        :param input_size: current dim of cont feature vector
         :param embedding_dim:
         :param scale:
         :param vocab_size:

@@ -25,9 +25,10 @@ class Model(nn.Module):
     def __init__(self,
                  encoder: Encoder,
                  decoder: Decoder,
-                 src_embed: ContinuousEmbeddings,
+                #  src_embed: ContinuousEmbeddings,
+                 src_embed: nn.Module,
                  trg_embed: Embeddings,
-                #  src_vocab: Vocabulary,
+                 src_vocab: Vocabulary,
                  trg_vocab: Vocabulary) -> None:
         """
         Create a new encoder-decoder model
@@ -36,7 +37,6 @@ class Model(nn.Module):
         :param decoder: decoder
         :param src_embed: source embedding
         :param trg_embed: target embedding
-        :param src_vocab: source vocabulary
         :param trg_vocab: target vocabulary
         """
         super().__init__()
@@ -45,7 +45,7 @@ class Model(nn.Module):
         self.trg_embed = trg_embed
         self.encoder = encoder
         self.decoder = decoder
-        # self.src_vocab = src_vocab
+        self.src_vocab = src_vocab
         self.trg_vocab = trg_vocab
         self.bos_index = self.trg_vocab.stoi[BOS_TOKEN]
         self.pad_index = self.trg_vocab.stoi[PAD_TOKEN]
@@ -198,25 +198,33 @@ class _DataParallel(nn.DataParallel):
             return getattr(self.module, name)
 
 
-def build_model(input_size: int,
+def build_model(input_size: int = None,
                 cfg: dict = None,
-                src_vocab: Vocabulary = None,
-                trg_vocab: Vocabulary = None) -> Model:
+                trg_vocab: Vocabulary = None,
+                src_vocab: Vocabulary = None) -> Model:
     """
     Build and initialize the model according to the configuration.
-
-    :param cfg: dictionary configuration containing model specifications
-    :param src_vocab: source vocabulary
+    :param input_size: input dimension of continuous features if src is continuous
+    :param cfg: dictionary configuration containing all specifications (not only model)
+    :param src_vocab: source vocabulary, if src is discrete
     :param trg_vocab: target vocabulary
     :return: built and initialized model
     """
-    # src_padding_idx = src_vocab.stoi[PAD_TOKEN]
+    if src_vocab is not None:
+        src_padding_idx = src_vocab.stoi[PAD_TOKEN]
     trg_padding_idx = trg_vocab.stoi[PAD_TOKEN]
 
-    src_embed = ContinuousEmbeddings(
-        **cfg["encoder"]["embeddings"], vocab_size=len(src_vocab),
-        input_size=input_size)
 
+    # TODO add: if cont_features: allow src_embed done with Embeddings()
+    print("***    build model config is ", cfg)
+    if cfg["data"]["continuous_src_features"]:
+        src_embed = ContinuousEmbeddings(
+            **cfg["model"]["encoder"]["embeddings"], input_size=input_size)
+    else:
+        src_embed = Embeddings(
+            **cfg["model"]["encoder"]["embeddings"], vocab_size=len(src_vocab),
+            padding_idx=src_padding_idx)
+    
     # this ties source and target embeddings
     # for softmax layer tying, see further below
     if cfg.get("tied_embeddings", False):
@@ -228,40 +236,40 @@ def build_model(input_size: int,
                 "Embedding cannot be tied since vocabularies differ.")
     else:
         trg_embed = Embeddings(
-            **cfg["decoder"]["embeddings"], vocab_size=len(trg_vocab),
+            **cfg["model"]["decoder"]["embeddings"], vocab_size=len(trg_vocab),
             padding_idx=trg_padding_idx)
 
     # build encoder
-    enc_dropout = cfg["encoder"].get("dropout", 0.)
-    enc_emb_dropout = cfg["encoder"]["embeddings"].get("dropout", enc_dropout)
-    if cfg["encoder"].get("type", "recurrent") == "transformer":
-        assert cfg["encoder"]["embeddings"]["embedding_dim"] == \
-               cfg["encoder"]["hidden_size"], \
+    enc_dropout = cfg["model"]["encoder"].get("dropout", 0.)
+    enc_emb_dropout = cfg["model"]["encoder"]["embeddings"].get("dropout", enc_dropout)
+    if cfg["model"]["encoder"].get("type", "recurrent") == "transformer":
+        assert cfg["model"]["encoder"]["embeddings"]["embedding_dim"] == \
+               cfg["model"]["encoder"]["hidden_size"], \
                "for transformer, emb_size must be hidden_size"
 
-        encoder = TransformerEncoder(**cfg["encoder"],
+        encoder = TransformerEncoder(**cfg["model"]["encoder"],
                                      emb_size=src_embed.embedding_dim,
                                      emb_dropout=enc_emb_dropout)
     else:
-        encoder = RecurrentEncoder(**cfg["encoder"],
+        encoder = RecurrentEncoder(**cfg["model"]["encoder"],
                                    emb_size=src_embed.embedding_dim,
                                    emb_dropout=enc_emb_dropout)
 
     # build decoder
-    dec_dropout = cfg["decoder"].get("dropout", 0.)
-    dec_emb_dropout = cfg["decoder"]["embeddings"].get("dropout", dec_dropout)
-    if cfg["decoder"].get("type", "recurrent") == "transformer":
+    dec_dropout = cfg["model"]["decoder"].get("dropout", 0.)
+    dec_emb_dropout = cfg["model"]["decoder"]["embeddings"].get("dropout", dec_dropout)
+    if cfg["model"]["decoder"].get("type", "recurrent") == "transformer":
         decoder = TransformerDecoder(
-            **cfg["decoder"], encoder=encoder, vocab_size=len(trg_vocab),
+            **cfg["model"]["decoder"], encoder=encoder, vocab_size=len(trg_vocab),
             emb_size=trg_embed.embedding_dim, emb_dropout=dec_emb_dropout)
     else:
         decoder = RecurrentDecoder(
-            **cfg["decoder"], encoder=encoder, vocab_size=len(trg_vocab),
+            **cfg["model"]["decoder"], encoder=encoder, vocab_size=len(trg_vocab),
             emb_size=trg_embed.embedding_dim, emb_dropout=dec_emb_dropout)
 
     model = Model(encoder=encoder, decoder=decoder,
                   src_embed=src_embed, trg_embed=trg_embed,
-                  trg_vocab=trg_vocab)
+                  src_vocab=src_vocab, trg_vocab=trg_vocab)
 
     # tie softmax layer with trg embeddings
     if cfg.get("tied_softmax", False):
@@ -276,6 +284,6 @@ def build_model(input_size: int,
                 "The decoder must be a Transformer.")
 
     # custom initialization of model parameters
-    initialize_model(model, cfg, trg_padding_idx)
+    initialize_model(model, cfg["model"], src_padding_idx, trg_padding_idx)
 
     return model

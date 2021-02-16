@@ -9,6 +9,7 @@ import os.path
 from typing import Optional
 import logging
 
+import torch
 from torchtext.datasets import TranslationDataset
 from torchtext import data
 from torchtext.data import Dataset, Iterator, Field
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_data(data_cfg: dict, datasets: list = None)\
-        -> (Dataset, Dataset, Optional[Dataset], Vocabulary, Vocabulary):
+        -> (Dataset, Dataset, Optional[Dataset], Vocabulary, Optional[Vocabulary]):
     """
     Load train, dev and optionally test data as specified in configuration.
     Vocabularies are created from the training set with a limit of `voc_limit`
@@ -40,7 +41,8 @@ def load_data(data_cfg: dict, datasets: list = None)\
         - train_data: training dataset
         - dev_data: development dataset
         - test_data: testdata set if given, otherwise None
-        - src_vocab: source vocabulary extracted from training data
+        - src_vocab: source vocabulary extracted from training data, 
+            `None` if not continuous src features
         - trg_vocab: target vocabulary extracted from training data
     """
     if datasets is None:
@@ -61,12 +63,38 @@ def load_data(data_cfg: dict, datasets: list = None)\
     max_sent_length = data_cfg["max_sent_length"]
 
     tok_fun = lambda s: list(s) if level == "char" else s.split()
+    
+    # WIP: Cihan's implementation
+    # TODO: refactor, check if using Field.sequential=False would work better?
+    def tok_fun_cont(features):
+        ft_list = torch.split(features, 1, dim=0)
+        return [ft.squeeze() for ft in ft_list]
 
-    src_field = data.Field(init_token=None, eos_token=EOS_TOKEN,
-                           pad_token=PAD_TOKEN, tokenize=tok_fun,
-                           batch_first=True, lower=lowercase,
-                           unk_token=UNK_TOKEN,
-                           include_lengths=True)
+    # TODO: fix using **kwargs
+    # NOTE (Cihan): The something was necessary to match the function signature.
+    def stack_features(features, something):
+        return torch.stack([torch.stack(ft, dim=0) for ft in features], dim=0)
+    
+    if data_cfg["continuous_src_features"]:
+        # src_field = data.Field(sequential=False, use_vocab=False,
+        #                     init_token=None, eos_token=EOS_TOKEN,
+        #                     pad_token=PAD_TOKEN, tokenize=tok_fun,
+        #                     batch_first=True, lower=lowercase,
+        #                     unk_token=UNK_TOKEN,
+        #                     include_lengths=True)
+        src_field = data.Field(sequential=True, use_vocab=False,
+                            dtype=torch.float32, preprocessing=tok_fun_cont,
+                            init_token=None, eos_token=EOS_TOKEN,
+                            pad_token=PAD_TOKEN, tokenize=lambda x: x,
+                            batch_first=True, lower=lowercase,
+                            postprocessing=stack_features,
+                            include_lengths=True)
+    else:
+        src_field = data.Field(init_token=None, eos_token=EOS_TOKEN,
+                            pad_token=PAD_TOKEN, tokenize=tok_fun,
+                            batch_first=True, lower=lowercase,
+                            unk_token=UNK_TOKEN,
+                            include_lengths=True)
 
     trg_field = data.Field(init_token=BOS_TOKEN, eos_token=EOS_TOKEN,
                            pad_token=PAD_TOKEN, tokenize=tok_fun,
@@ -95,21 +123,27 @@ def load_data(data_cfg: dict, datasets: list = None)\
                 random_state=random.getstate())
             train_data = keep
 
-    src_max_size = data_cfg.get("src_voc_limit", sys.maxsize)
-    src_min_freq = data_cfg.get("src_voc_min_freq", 1)
     trg_max_size = data_cfg.get("trg_voc_limit", sys.maxsize)
     trg_min_freq = data_cfg.get("trg_voc_min_freq", 1)
 
-    src_vocab_file = data_cfg.get("src_vocab", None)
-    trg_vocab_file = data_cfg.get("trg_vocab", None)
+    if not data_cfg["continuous_src_features"]:
+        src_max_size = data_cfg.get("src_voc_limit", sys.maxsize)
+        src_min_freq = data_cfg.get("src_voc_min_freq", 1)
+        src_vocab_file = data_cfg.get("src_vocab", None) 
+        assert (train_data is not None) or (src_vocab_file is not None)
 
-    assert (train_data is not None) or (src_vocab_file is not None)
+    trg_vocab_file = data_cfg.get("trg_vocab", None)
     assert (train_data is not None) or (trg_vocab_file is not None)
 
-    logger.info("building vocabulary...")
-    src_vocab = build_vocab(field="src", min_freq=src_min_freq,
-                            max_size=src_max_size,
-                            dataset=train_data, vocab_file=src_vocab_file)
+    src_vocab = None
+    if not data_cfg["continuous_src_features"]:
+        logger.info("building src vocabulary...")
+
+        src_vocab = build_vocab(field="src", min_freq=src_min_freq,
+                                max_size=src_max_size,
+                                dataset=train_data, vocab_file=src_vocab_file)
+
+    logger.info("building trg vocabulary...")
     trg_vocab = build_vocab(field="trg", min_freq=trg_min_freq,
                             max_size=trg_max_size,
                             dataset=train_data, vocab_file=trg_vocab_file)
@@ -133,7 +167,13 @@ def load_data(data_cfg: dict, datasets: list = None)\
             # no target is given -> create dataset from src only
             test_data = MonoDataset(path=test_path, ext="." + src_lang,
                                     field=src_field)
-    src_field.vocab = src_vocab
+    
+    if not data_cfg["continuous_src_features"]:
+        logger.info("src vocab len: %d\n", len(src_vocab))
+        logger.info("src vocab: %s\n", src_vocab)
+
+        src_field.vocab = src_vocab
+    
     trg_field.vocab = trg_vocab
     logger.info("data loaded.")
     return train_data, dev_data, test_data, src_vocab, trg_vocab
