@@ -81,7 +81,7 @@ class ContinuousEmbeddings(nn.Module):
         :param freeze: freeze the embeddings during training
         """
         super().__init__()
-
+        self.input_size = input_size
         self.embedding_dim = embedding_dim
         self.scale = scale
         self.ln = nn.Linear(self.input_size, self.embedding_dim)

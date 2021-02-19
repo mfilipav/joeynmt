@@ -722,7 +722,7 @@ def train(cfg_file: str) -> None:
         train_data, dev_data, test_data, src_vocab, trg_vocab = load_data(data_cfg=cfg["data"])
         logger.info("   loaded data with continuous src_features...")
     else:
-        train_data, dev_data, test_data, trg_vocab, src_vocab = load_data(data_cfg=cfg["data"])
+        train_data, dev_data, test_data, src_vocab, trg_vocab = load_data(data_cfg=cfg["data"])
         logger.info("   loaded data with discrete src features...")
 
     # build an encoder-decoder model  
@@ -745,15 +745,16 @@ def train(cfg_file: str) -> None:
 
     # log all entries of config
     log_cfg(cfg)
-
     log_data_info(train_data=train_data, valid_data=dev_data,
-                  test_data=test_data, src_vocab=src_vocab, trg_vocab=trg_vocab)
+                  test_data=test_data, src_vocab=src_vocab, trg_vocab=trg_vocab,
+                  cont_input_features=cfg["data"]["continuous_src_features"])
 
     logger.info(str(model))
 
     # store the vocabs
-    src_vocab_file = "{}/src_vocab.txt".format(cfg["training"]["model_dir"])
-    src_vocab.to_file(src_vocab_file)
+    if not cfg["data"]["continuous_src_features"]:
+        src_vocab_file = "{}/src_vocab.txt".format(cfg["training"]["model_dir"])
+        src_vocab.to_file(src_vocab_file)
     trg_vocab_file = "{}/trg_vocab.txt".format(cfg["training"]["model_dir"])
     trg_vocab.to_file(trg_vocab_file)
 

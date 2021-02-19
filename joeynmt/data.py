@@ -84,11 +84,13 @@ def load_data(data_cfg: dict, datasets: list = None)\
         #                     include_lengths=True)
         src_field = data.Field(sequential=True, use_vocab=False,
                             dtype=torch.float32, preprocessing=tok_fun_cont,
-                            init_token=None, eos_token=EOS_TOKEN,
-                            pad_token=PAD_TOKEN, tokenize=lambda x: x,
-                            batch_first=True, lower=lowercase,
+                            init_token=None, eos_token=None,
+                            pad_token=torch.zeros((data_cfg["input_size"],)), # tokenize=lambda x: x,
+                            batch_first=True, lower=False,
                             postprocessing=stack_features,
                             include_lengths=True)
+        logger.info("   ** src field **")
+        logger.info("SRC FIELD IS:  %s", src_field)
     else:
         src_field = data.Field(init_token=None, eos_token=EOS_TOKEN,
                             pad_token=PAD_TOKEN, tokenize=tok_fun,
@@ -105,14 +107,31 @@ def load_data(data_cfg: dict, datasets: list = None)\
     train_data = None
     if "train" in datasets and train_path is not None:
         logger.info("loading training data...")
-        train_data = TranslationDataset(path=train_path,
-                                        exts=("." + src_lang, "." + trg_lang),
-                                        fields=(src_field, trg_field),
-                                        filter_pred=
-                                        lambda x: len(vars(x)['src'])
-                                        <= max_sent_length
-                                        and len(vars(x)['trg'])
-                                        <= max_sent_length)
+        
+        if data_cfg["continuous_src_features"]:
+            train_data = TranslationDataset(cont_input_features=True,
+                                            path=train_path,
+                                            exts=("." + src_lang, "." + trg_lang),
+                                            fields=(src_field, trg_field),
+                                            filter_pred=
+                                            lambda x: len(vars(x)['src']) # filter_pred (callable or None): Use only examples for which filter_pred(example) is True, or use all examples if None.
+                                            <= max_sent_length
+                                            and len(vars(x)['trg'])
+                                            <= max_sent_length)
+
+        else:
+            train_data = TranslationDataset(cont_input_features=False,
+                                            path=train_path,
+                                            exts=("." + src_lang, "." + trg_lang),
+                                            fields=(src_field, trg_field),
+                                            filter_pred=
+                                            lambda x: len(vars(x)['src']) # filter_pred (callable or None): Use only examples for which filter_pred(example) is True, or use all examples if None.
+                                            <= max_sent_length
+                                            and len(vars(x)['trg'])
+                                            <= max_sent_length)            
+
+
+
 
         random_train_subset = data_cfg.get("random_train_subset", -1)
         if random_train_subset > -1:
@@ -148,25 +167,43 @@ def load_data(data_cfg: dict, datasets: list = None)\
                             max_size=trg_max_size,
                             dataset=train_data, vocab_file=trg_vocab_file)
 
+
     dev_data = None
     if "dev" in datasets and dev_path is not None:
         logger.info("loading dev data...")
-        dev_data = TranslationDataset(path=dev_path,
-                                      exts=("." + src_lang, "." + trg_lang),
-                                      fields=(src_field, trg_field))
 
+        if data_cfg["continuous_src_features"]:
+            dev_data = TranslationDataset(cont_input_features=True,
+                                          path=dev_path,
+                                          exts=("." + src_lang, "." + trg_lang),
+                                          fields=(src_field, trg_field))
+        else:
+            dev_data = TranslationDataset(cont_input_features=False,
+                                          path=dev_path,
+                                          exts=("." + src_lang, "." + trg_lang),
+                                          fields=(src_field, trg_field))
+           
+            
     test_data = None
     if "test" in datasets and test_path is not None:
         logger.info("loading test data...")
-        # check if target exists
-        if os.path.isfile(test_path + "." + trg_lang):
-            test_data = TranslationDataset(
-                path=test_path, exts=("." + src_lang, "." + trg_lang),
-                fields=(src_field, trg_field))
+        
+        if data_cfg["continuous_src_features"]:
+            test_data = TranslationDataset(cont_input_features=True,
+                                           path=test_path,
+                                           exts=("." + src_lang, "." + trg_lang),
+                                           fields=(src_field, trg_field))
+    
         else:
-            # no target is given -> create dataset from src only
-            test_data = MonoDataset(path=test_path, ext="." + src_lang,
-                                    field=src_field)
+            # check if target exists
+            if os.path.isfile(test_path + "." + trg_lang):
+                test_data = TranslationDataset(cont_input_features=False,
+                    path=test_path, exts=("." + src_lang, "." + trg_lang),
+                    fields=(src_field, trg_field))
+            else:
+                # no target is given -> create dataset from src only
+                test_data = MonoDataset(path=test_path, ext="." + src_lang,
+                                        field=src_field)
     
     if not data_cfg["continuous_src_features"]:
         logger.info("src vocab len: %d\n", len(src_vocab))

@@ -200,8 +200,8 @@ class _DataParallel(nn.DataParallel):
 
 def build_model(input_size: int = None,
                 cfg: dict = None,
-                trg_vocab: Vocabulary = None,
-                src_vocab: Vocabulary = None) -> Model:
+                src_vocab: Vocabulary = None,
+                trg_vocab: Vocabulary = None) -> Model:
     """
     Build and initialize the model according to the configuration.
     :param input_size: input dimension of continuous features if src is continuous
@@ -210,8 +210,11 @@ def build_model(input_size: int = None,
     :param trg_vocab: target vocabulary
     :return: built and initialized model
     """
-    if src_vocab is not None:
+    cont_input_features= cfg["data"]["continuous_src_features"]
+    
+    if not cont_input_features:
         src_padding_idx = src_vocab.stoi[PAD_TOKEN]
+        
     trg_padding_idx = trg_vocab.stoi[PAD_TOKEN]
 
 
@@ -284,6 +287,9 @@ def build_model(input_size: int = None,
                 "The decoder must be a Transformer.")
 
     # custom initialization of model parameters
-    initialize_model(model, cfg["model"], src_padding_idx, trg_padding_idx)
-
+    if cont_input_features:
+        initialize_model(model, cfg["model"], trg_padding_idx, src_padding_idx=None)
+    else:
+        initialize_model(model, cfg["model"], trg_padding_idx, src_padding_idx)
+        
     return model

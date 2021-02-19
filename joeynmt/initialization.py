@@ -57,8 +57,8 @@ def xavier_uniform_n_(w: Tensor, gain: float = 1., n: int = 4) -> None:
 
 
 # pylint: disable=too-many-branches
-def initialize_model(model: nn.Module, cfg: dict, src_padding_idx: int,
-                     trg_padding_idx: int) -> None:
+def initialize_model(model: nn.Module, cfg: dict,
+                     trg_padding_idx: int, src_padding_idx: int = None) -> None:
     """
     This initializes a model based on the provided config.
 
@@ -129,11 +129,14 @@ def initialize_model(model: nn.Module, cfg: dict, src_padding_idx: int,
 
     with torch.no_grad():
         for name, p in model.named_parameters():
+            if cfg["continuous_src_features"]:
+                if "trg_embed" in name:
+                    embed_init_fn_(p)
+            else:
+                if "embed" in name:
+                    embed_init_fn_(p)
 
-            if "embed" in name:
-                embed_init_fn_(p)
-
-            elif "bias" in name:
+            if "bias" in name:
                 bias_init_fn_(p)
 
             elif len(p.size()) > 1:
@@ -151,7 +154,8 @@ def initialize_model(model: nn.Module, cfg: dict, src_padding_idx: int,
                     init_fn_(p)
 
         # zero out paddings
-        model.src_embed.lut.weight.data[src_padding_idx].zero_()
+        if not cfg["continuous_src_features"]:
+            model.src_embed.lut.weight.data[src_padding_idx].zero_()
         model.trg_embed.lut.weight.data[trg_padding_idx].zero_()
 
         orthogonal = cfg.get("init_rnn_orthogonal", False)
