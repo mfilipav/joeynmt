@@ -71,7 +71,7 @@ class MultiHeadedAttention(nn.Module):
         # batch x num_heads x query_len x key_len
         scores = torch.matmul(q, k.transpose(2, 3))
         print("       \n k.transpose(2, 3)) :\n ", k.transpose(2, 3).size(), "")
-        print("       \n scores = torch.matmul(q, k.transpose(2, 3)) \n ", scores.size(), "")
+        print("       \n scores = torch.matmul(q, k.transpose(2, 3)): \n ", scores.size(), "")
 
         # apply the mask (if we have one)
         # we add a dimension for the heads to it below: [B, 1, 1, M]
