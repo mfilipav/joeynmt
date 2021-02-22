@@ -120,6 +120,8 @@ class Model(nn.Module):
         :param trg_mask: target mask
         :return: decoder outputs
         """
+        print("       \n ** model_cont._encode.src_mask size: \n ", src_mask.size(), "")
+        print(" bla", src_mask.shape())
         encoder_output, encoder_hidden = self._encode(src=src,
                                                       src_length=src_length,
                                                       src_mask=src_mask,
@@ -218,8 +220,6 @@ def build_model(input_size: int = None,
     trg_padding_idx = trg_vocab.stoi[PAD_TOKEN]
 
 
-    # TODO add: if cont_features: allow src_embed done with Embeddings()
-    print("***    build model config is ", cfg)
     if cfg["data"]["continuous_src_features"]:
         src_embed = ContinuousEmbeddings(
             **cfg["model"]["encoder"]["embeddings"], input_size=input_size)

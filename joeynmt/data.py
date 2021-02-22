@@ -10,7 +10,9 @@ from typing import Optional
 import logging
 
 import torch
-from torchtext.datasets import TranslationDataset
+from torchtext import data
+from joeynmt.translation import TranslationDataset
+# from torchtext.datasets import TranslationDataset
 from torchtext import data
 from torchtext.data import Dataset, Iterator, Field
 
