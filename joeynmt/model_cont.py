@@ -74,7 +74,7 @@ class Model(nn.Module):
         if return_type is None:
             raise ValueError("Please specify return_type: "
                              "{`loss`, `encode`, `decode`}.")
-
+                   
         return_tuple = (None, None, None, None)
         if return_type == "loss":
             assert self.loss_function is not None
@@ -120,8 +120,11 @@ class Model(nn.Module):
         :param trg_mask: target mask
         :return: decoder outputs
         """
-        print("       \n ** model_cont._encode.src_mask size: \n ", src_mask.size(), "")
-        print(" bla", src_mask.shape())
+        
+        # MF's bug resolution: 4D tensor returned with [B, 1, M, D] instead of [B, 1, M]
+        if len(list(src_mask.size())) == 4:
+            src_mask = src_mask[:, :, :, 0]
+
         encoder_output, encoder_hidden = self._encode(src=src,
                                                       src_length=src_length,
                                                       src_mask=src_mask,
@@ -291,5 +294,6 @@ def build_model(input_size: int = None,
         initialize_model(model, cfg["model"], trg_padding_idx, src_padding_idx=None)
     else:
         initialize_model(model, cfg["model"], trg_padding_idx, src_padding_idx)
-        
+    
+    
     return model

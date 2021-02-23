@@ -217,9 +217,10 @@ class TransformerEncoder(Encoder):
         """
         x = self.pe(embed_src)  # add position encoding to word embeddings
         x = self.emb_dropout(x)
-        print("        \n \n \n encoders.TransformerEncoder.mask: \n ", mask.size())
+
         for layer in self.layers:
             x = layer(x, mask)
+
         return self.layer_norm(x), None
 
     def __repr__(self):

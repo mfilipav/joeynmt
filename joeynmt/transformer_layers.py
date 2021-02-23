@@ -53,29 +53,29 @@ class MultiHeadedAttention(nn.Module):
 
         # project the queries (q), keys (k), and values (v)
         k = self.k_layer(k)
-        print("      \n \n \n transformers_layers.k original: \n ", k.size())
+        # print("      \n \n \n transformers_layers.k original: \n ", k.size())
 
         v = self.v_layer(v)
         q = self.q_layer(q)
 
         # reshape q, k, v for our computation to [batch_size, num_heads, ..]
         k = k.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
-        print("        \n k reshaped: \n ", k.size())
+        # print("        \n k reshaped: \n ", k.size())
 
         v = v.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
         q = q.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
 
         # compute scores
         q = q / math.sqrt(self.head_size)
-        print("       \n q reshaped:  \n ", q.size())
+        # print("       \n q reshaped:  \n ", q.size())
         # batch x num_heads x query_len x key_len
         scores = torch.matmul(q, k.transpose(2, 3))
-        print("       \n k.transpose(2, 3)) :\n ", k.transpose(2, 3).size(), "")
-        print("       \n scores = torch.matmul(q, k.transpose(2, 3)): \n ", scores.size(), "")
+        # print("       \n k.transpose(2, 3)) :\n ", k.transpose(2, 3).size(), "")
+        # print("       \n scores = torch.matmul(q, k.transpose(2, 3)): \n ", scores.size(), "")
 
         # apply the mask (if we have one)
         # we add a dimension for the heads to it below: [B, 1, 1, M]
-        print("       \n transformer_layers.mask size: \n ", mask.size(), "")
+        # print("       \n transformer_layers.mask size: \n ", mask.size(), "")
         if mask is not None:
             scores = scores.masked_fill(~mask.unsqueeze(1), float('-inf'))
 

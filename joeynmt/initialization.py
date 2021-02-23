@@ -156,7 +156,6 @@ def initialize_model(model: nn.Module, cfg: dict,
         # zero out paddings
         if not cfg["continuous_src_features"]:
             model.src_embed.lut.weight.data[src_padding_idx].zero_()
-        model.trg_embed.lut.weight.data[trg_padding_idx].zero_()
 
         orthogonal = cfg.get("init_rnn_orthogonal", False)
         lstm_forget_gate = cfg.get("lstm_forget_gate", 1.)
