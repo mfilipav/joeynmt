@@ -24,6 +24,7 @@ class Batch:
         """
         self.src, self.src_length = torch_batch.src
         self.src_mask = (self.src != pad_index).unsqueeze(1)
+        # print(" \n self.src: \n", self.src.size(), "\n (self.src != pad_index): \n", (self.src != pad_index).size(), "\n self.src_mask: \n", self.src_mask.size())
         self.nseqs = self.src.size(0)
         self.trg_input = None
         self.trg = None

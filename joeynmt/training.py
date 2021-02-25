@@ -60,6 +60,7 @@ class TrainManager:
         :param batch_class: batch class to encapsulate the torch class
         """
         train_config = config["training"]
+        self.cont_input_features = config["data"]["continuous_src_features"]
         self.batch_class = batch_class
 
         # files for logging and storing
@@ -518,7 +519,8 @@ class TrainManager:
                 postprocess=True,           # always remove BPE for validation
                 bpe_type=self.bpe_type,     # "subword-nmt" or "sentencepiece"
                 sacrebleu=self.sacrebleu,   # sacrebleu options
-                n_gpu=self.n_gpu
+                n_gpu=self.n_gpu,
+                cont_input_features=self.cont_input_features
             )
 
         self.tb_writer.add_scalar(
@@ -555,14 +557,17 @@ class TrainManager:
             valid_score=valid_score, valid_loss=valid_loss,
             valid_ppl=valid_ppl, eval_metric=self.eval_metric,
             new_best=new_best)
-
-        self._log_examples(
-            sources_raw=[v for v in valid_sources_raw],
-            sources=valid_sources,
-            hypotheses_raw=valid_hypotheses_raw,
-            hypotheses=valid_hypotheses,
-            references=valid_references
-        )
+        if not self.cont_input_features:
+            self._log_examples(
+                sources_raw=[v for v in valid_sources_raw],
+                sources=valid_sources,
+                hypotheses_raw=valid_hypotheses_raw,
+                hypotheses=valid_hypotheses,
+                references=valid_references
+            )
+        else:
+            logger.info("FIX, log validation examples with continuous features.. ")
+            
 
         valid_duration = time.time() - valid_start_time
         logger.info(

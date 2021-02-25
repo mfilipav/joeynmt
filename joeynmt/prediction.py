@@ -36,7 +36,8 @@ def validate_on_data(model: Model, data: Dataset,
                      batch_type: str = "sentence",
                      postprocess: bool = True,
                      bpe_type: str = "subword-nmt",
-                     sacrebleu: dict = None) \
+                     sacrebleu: dict = None,
+                     cont_input_features: bool = True)\
         -> (float, float, float, List[str], List[List[str]], List[str],
             List[str], List[List[str]], List[np.array]):
     """
@@ -88,7 +89,12 @@ def validate_on_data(model: Model, data: Dataset,
         dataset=data, batch_size=batch_size, batch_type=batch_type,
         shuffle=False, train=False)
     valid_sources_raw = data.src
-    pad_index =  model.src_vocab.stoi[PAD_TOKEN]
+    
+    # if not cont_input_features:
+    pad_index =  model.trg_vocab.stoi[PAD_TOKEN]
+
+    print("         **** pad_index is: \t", pad_index)
+        
     # disable dropout
     model.eval()
     # don't track gradients during validation
@@ -142,7 +148,10 @@ def validate_on_data(model: Model, data: Dataset,
 
         # evaluate with metric on full dataset
         join_char = " " if level in ["word", "bpe"] else ""
-        valid_sources = [join_char.join(s) for s in data.src]
+        if cont_input_features:
+            valid_sources = None
+        else:
+            valid_sources = [join_char.join(s) for s in data.src]
         valid_references = [join_char.join(t) for t in data.trg]
         valid_hypotheses = [join_char.join(t) for t in decoded_valid]
 
@@ -327,7 +336,8 @@ def test(cfg_file,
             max_output_length=max_output_length, eval_metric=eval_metric,
             use_cuda=use_cuda, compute_loss=False, beam_size=beam_size,
             beam_alpha=beam_alpha, postprocess=postprocess,
-            bpe_type=bpe_type, sacrebleu=sacrebleu, n_gpu=n_gpu)
+            bpe_type=bpe_type, sacrebleu=sacrebleu, n_gpu=n_gpu,
+            cont_input_features=cfg_file["data"]["continuous_src_features"])
         #pylint: enable=unused-variable
 
         if "trg" in data_set.fields:
@@ -409,7 +419,8 @@ def translate(cfg_file: str,
             max_output_length=max_output_length, eval_metric="",
             use_cuda=use_cuda, compute_loss=False, beam_size=beam_size,
             beam_alpha=beam_alpha, postprocess=postprocess,
-            bpe_type=bpe_type, sacrebleu=sacrebleu, n_gpu=n_gpu)
+            bpe_type=bpe_type, sacrebleu=sacrebleu, n_gpu=n_gpu,
+            cont_input_features=cfg_file["data"]["continuous_src_features"])
         return hypotheses
 
     cfg = load_config(cfg_file)

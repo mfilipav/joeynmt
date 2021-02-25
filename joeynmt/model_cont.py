@@ -148,6 +148,12 @@ class Model(nn.Module):
         :param src_mask:
         :return: encoder outputs (output, hidden_concat)
         """
+        # MF's bug resolution: 4D tensor returned with [B, 1, M, D] instead of [B, 1, M]
+        if len(list(src_mask.size())) == 4:
+            print("\n before, encode.src_mask.size(): ", src_mask.size())
+            src_mask = src_mask[:, :, :, 0]
+            print("\n after, encode.src_mask.size(): ", src_mask.size())
+
         return self.encoder(self.src_embed(src), src_length, src_mask,
                             **_kwargs)
 
@@ -169,6 +175,12 @@ class Model(nn.Module):
         :param trg_mask: mask for target steps
         :return: decoder outputs (outputs, hidden, att_probs, att_vectors)
         """
+        # MF's bug resolution: 4D tensor returned with [B, 1, M, D] instead of [B, 1, M]
+        if len(list(src_mask.size())) == 4:
+            print("\n before, decode.src_mask.size(): ", src_mask.size())
+            src_mask = src_mask[:, :, :, 0]
+            print("\n after, decode.src_mask.size(): ", src_mask.size())
+
         return self.decoder(trg_embed=self.trg_embed(trg_input),
                             encoder_output=encoder_output,
                             encoder_hidden=encoder_hidden,
